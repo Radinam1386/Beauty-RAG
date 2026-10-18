@@ -1,0 +1,5 @@
+venv*
+env*
+backend/venv
+test.txt__pycache__/
+*.pyc
