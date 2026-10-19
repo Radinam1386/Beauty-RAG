@@ -1,0 +1,11 @@
+dependencies = [
+  "sqlalchemy[asyncio]>=2.0",
+  "asyncpg",
+  "alembic",
+  "pydantic-settings",
+  "httpx",
+  "pgvector",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio", "respx"]
