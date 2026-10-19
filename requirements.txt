@@ -4,3 +4,4 @@ alembic
 pydantic-settings
 httpx
 pgvector
+pytest
