@@ -1,0 +1,124 @@
+<div class="chat-layout" [class.sidebar-open]="sidebarOpen()">
+  <aside class="conv-sidebar">
+    <div class="sidebar-head">
+      <button type="button" class="btn btn-primary btn-block" (click)="newChat()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        گفتگوی جدید
+      </button>
+    </div>
+
+    <div class="conv-list">
+      @if (loadingList()) {
+        @for (i of [1, 2, 3]; track i) {
+          <div class="conv-skeleton"></div>
+        }
+      } @else {
+        @for (conv of conversations(); track conv.id) {
+          <div class="conv-row" [class.active]="conv.id === activeId()">
+            <button type="button" class="conv-item" (click)="select(conv)">
+              <span class="conv-title">{{ conv.title }}</span>
+              <span class="conv-date">{{ faDate(conv.updatedAt) }}</span>
+            </button>
+            @if (confirmDeleteId() === conv.id) {
+              <span class="conv-confirm">
+                <button type="button" class="mini danger" (click)="remove(conv)">حذف</button>
+                <button type="button" class="mini" (click)="cancelDelete()">انصراف</button>
+              </span>
+            } @else {
+              <button type="button" class="icon-btn conv-del" (click)="askDelete(conv)" aria-label="حذف گفتگو" title="حذف گفتگو">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+              </button>
+            }
+          </div>
+        } @empty {
+          <p class="conv-empty">هنوز گفتگویی ندارید.<br>یکی را شروع کنید.</p>
+        }
+      }
+    </div>
+  </aside>
+
+  @if (sidebarOpen()) {
+    <div class="sidebar-backdrop" (click)="sidebarOpen.set(false)"></div>
+  }
+
+  <section class="chat-main">
+    <header class="chat-head">
+      <button type="button" class="icon-btn mobile-only" (click)="sidebarOpen.set(true)" aria-label="فهرست گفتگوها">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div class="chat-head-text">
+        <h1>گفتگو با دستیار</h1>
+        <p>پاسخ تخصصی حوزه زیبایی، جستجوی آگهی و مشاوره محصولات</p>
+      </div>
+    </header>
+
+    <div class="thread" aria-live="polite">
+      @if (!activeId()) {
+        <div class="welcome">
+          <div class="welcome-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C7 3 3 6.6 3 11c0 2.2 1 4.2 2.7 5.6L5 21l4-1.6c1 .3 2 .5 3 .5 5 0 9-3.6 9-8s-4-8-9-8z"/></svg>
+          </div>
+          <h2>سلام! چطور می‌توانم کمک کنم؟</h2>
+          <p class="welcome-sub">درباره خدمات زیبایی یا آگهی‌های سایت بپرسید.</p>
+          <div class="suggestions">
+            @for (s of suggestions; track s.label) {
+              <button type="button" class="suggestion" (click)="useSuggestion(s)">{{ s.label }}</button>
+            }
+          </div>
+        </div>
+      } @else {
+        <div class="messages">
+          @for (m of messages(); track m.id) {
+            <article class="msg" [class.user]="m.role === 'user'" [class.failed]="m.failed">
+              <div class="bubble">
+                <p class="content">{{ m.content }}</p>
+                @if (m.listings; as listings) {
+                  @if (listings.length) {
+                    <div class="msg-listings">
+                      @for (l of listings; track l.id) {
+                        <bb-listing-card [listing]="l" />
+                      }
+                    </div>
+                  }
+                }
+                @if (m.sources; as sources) {
+                  @if (sources.length) {
+                    <div class="msg-sources">
+                      <span class="sources-label">منابع:</span>
+                      @for (s of sources; track s.title) {
+                        @if (s.url) {
+                          <a class="chip" [href]="s.url" target="_blank" rel="noopener">{{ s.title }}</a>
+                        } @else {
+                          <span class="chip">{{ s.title }}</span>
+                        }
+                      }
+                    </div>
+                  }
+                }
+              </div>
+            </article>
+          }
+          @if (sending()) {
+            <div class="msg assistant">
+              <div class="bubble typing-bubble" aria-label="دستیار در حال نوشتن است">
+                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+              </div>
+            </div>
+          }
+        </div>
+      }
+      <div #bottomAnchor class="bottom-anchor"></div>
+    </div>
+
+    <footer class="composer">
+      <div class="composer-box">
+        <textarea #composerEl rows="1" placeholder="پیام خود را بنویسید…"
+          [value]="draft()" (input)="onInput($event)" (keydown)="onComposerKeydown($event)"></textarea>
+        <button type="button" class="send-btn" (click)="send()" [disabled]="sending() || !draft().trim()" aria-label="ارسال پیام">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4l17.4-7.5a1 1 0 0 0 0-1.8L3.4 3.6a1 1 0 0 0-1.4 1L3.9 11c.1.5.5.9 1 1l7.6 1-7.6 1c-.5.1-.9.5-1 1l-1.9 6.3a1 1 0 0 0 1.4 1z"/></svg>
+        </button>
+      </div>
+      <p class="composer-hint">Enter برای ارسال، Shift + Enter برای خط جدید</p>
+    </footer>
+  </section>
+</div>

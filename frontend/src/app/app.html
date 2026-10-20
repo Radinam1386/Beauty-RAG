@@ -1,0 +1,21 @@
+<div class="shell">
+  <header class="topbar">
+    <a routerLink="/chat" class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C7 3 3 6.6 3 11c0 2.2 1 4.2 2.7 5.6L5 21l4-1.6c1 .3 2 .5 3 .5 5 0 9-3.6 9-8s-4-8-9-8z"/></svg>
+      </span>
+      <span class="brand-text">BeautyBoss <b>AI</b></span>
+      <span class="brand-sub">دستیار هوشمند</span>
+    </a>
+
+    <nav class="main-nav" aria-label="ناوبری اصلی">
+      <a routerLink="/chat" routerLinkActive="active">گفتگو</a>
+      <a routerLink="/search" routerLinkActive="active">جستجوی آگهی</a>
+      <a routerLink="/guide" routerLinkActive="active">راهنما</a>
+    </nav>
+  </header>
+
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>

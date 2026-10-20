@@ -1,0 +1,56 @@
+<div class="page">
+  <header class="page-head">
+    <h1>جستجوی هوشمند آگهی</h1>
+    <p>دنبال چه خدمتی هستید؟ با زبان خودتان بنویسید تا آگهی‌های مرتبط سایت را پیدا کنیم.</p>
+  </header>
+
+  <form class="search-bar card" (submit)="search($event)">
+    <input class="input search-input" type="text" placeholder="مثلاً: رنگ و مش مو در تهران"
+      [value]="query()" (input)="onQueryInput($event)" aria-label="عبارت جستجو" />
+    <select class="input category-select" (change)="onCategoryChange($event)" aria-label="دستهٔ خدمت">
+      <option value="">همه دسته‌ها</option>
+      @for (c of categories(); track c.id) {
+        <option [value]="c.id" [selected]="c.id === categoryId()">{{ c.name }}</option>
+      }
+    </select>
+    <button class="btn btn-primary" type="submit" [disabled]="searching() || !query().trim()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      {{ searching() ? 'در حال جستجو…' : 'جستجو' }}
+    </button>
+  </form>
+
+  @if (!searched()) {
+    <section class="search-start card">
+      <h2>از این‌جا شروع کنید</h2>
+      <p>چند نمونه جستجو برای شروع:</p>
+      <div class="example-chips">
+        @for (q of examples; track q) {
+          <button type="button" class="chip example" (click)="useExample(q)">{{ q }}</button>
+        }
+      </div>
+    </section>
+  } @else if (searching()) {
+    <div class="results-state">
+      <p class="state-text">در حال جستجوی آگهی‌ها…</p>
+    </div>
+  } @else if (searchError()) {
+    <div class="results-state card">
+      <h2>جستجو انجام نشد</h2>
+      <p class="state-text">خطا در ارتباط با سرویس جستجو. لطفاً دوباره تلاش کنید.</p>
+    </div>
+  } @else if (results().length === 0) {
+    <div class="results-state card">
+      <h2>نتیجه‌ای برای «{{ lastQuery() }}» پیدا نشد</h2>
+      <p class="state-text">عبارت کلی‌تری امتحان کنید یا دستهٔ خدمت را تغییر دهید.</p>
+    </div>
+  } @else {
+    <section class="results">
+      <p class="results-count">{{ results().length }} نتیجه برای «{{ lastQuery() }}»</p>
+      <div class="results-grid">
+        @for (l of results(); track l.id) {
+          <bb-listing-card [listing]="l" />
+        }
+      </div>
+    </section>
+  }
+</div>

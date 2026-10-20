@@ -1,0 +1,183 @@
+/* ============================================================
+   تم رنگی بر اساس پالت سایت BeautyBoss
+   بنفش اصلی #7c3aed · ارغوانی #a855f7 · بنفش تیره #4E1284 / #2D1B40
+   طلایی #C29D59 · سطح‌های روشن #FCFAFE / #f8f8f8
+   ============================================================ */
+:root {
+  --bb-primary: #7c3aed;
+  --bb-primary-strong: #6d28d9;
+  --bb-purple: #a855f7;
+  --bb-deep: #4e1284;
+  --bb-ink: #2d1b40;
+  --bb-gold: #c29d59;
+  --bb-bg: #f8f8f8;
+  --bb-surface: #ffffff;
+  --bb-surface-lav: #fcfafe;
+  --bb-lav-100: #f3e8ff;
+  --bb-lav-200: #e9d5ff;
+  --bb-lav-300: #d8b4fe;
+  --bb-border: #e2e8f0;
+  --bb-text: #2d1b40;
+  --bb-muted: #64748b;
+  --bb-faint: #94a3b8;
+  --bb-success: #16a34a;
+  --bb-danger: #ef4444;
+  --bb-radius: 12px;
+  --bb-radius-sm: 8px;
+  --bb-shadow: 0 1px 2px rgba(45, 27, 64, .05), 0 6px 20px rgba(45, 27, 64, .06);
+  --bb-grad: linear-gradient(135deg, #7c3aed, #a855f7);
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bb-bg);
+  color: var(--bb-text);
+  font-family: 'Vazirmatn', 'Vazir', 'Segoe UI', Tahoma, sans-serif;
+  font-size: 15px;
+  line-height: 1.9;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 { color: var(--bb-deep); margin: 0; line-height: 1.55; }
+p { margin: 0; }
+
+a { color: var(--bb-primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+button { font-family: inherit; }
+
+/* ---------- دکمه‌ها ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  border: 1px solid transparent;
+  border-radius: var(--bb-radius-sm);
+  padding: .55rem 1.1rem;
+  font-size: .92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, filter .15s ease, opacity .15s ease;
+}
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+.btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+.btn-primary { background: var(--bb-grad); color: #fff; }
+.btn-primary:hover:not(:disabled) { filter: brightness(1.06); text-decoration: none; }
+
+.btn-outline {
+  background: var(--bb-surface);
+  border-color: var(--bb-border);
+  color: var(--bb-ink);
+}
+.btn-outline:hover:not(:disabled) {
+  border-color: var(--bb-lav-300);
+  background: var(--bb-surface-lav);
+  text-decoration: none;
+}
+
+.btn-ghost { background: transparent; color: var(--bb-muted); }
+.btn-ghost:hover:not(:disabled) { background: var(--bb-lav-100); color: var(--bb-deep); }
+
+.btn-block { width: 100%; }
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--bb-muted);
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.icon-btn:hover { background: var(--bb-lav-100); color: var(--bb-deep); }
+.icon-btn svg { width: 18px; height: 18px; }
+
+.linklike {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--bb-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.linklike:hover { text-decoration: underline; }
+
+/* ---------- فرم‌ها ---------- */
+.field { margin-bottom: 1.1rem; }
+.field-label {
+  display: block;
+  font-size: .85rem;
+  font-weight: 700;
+  color: var(--bb-ink);
+  margin-bottom: .35rem;
+}
+.input, select.input, textarea.input {
+  width: 100%;
+  background: var(--bb-surface);
+  border: 1px solid var(--bb-border);
+  border-radius: var(--bb-radius-sm);
+  padding: .6rem .85rem;
+  font: inherit;
+  color: var(--bb-text);
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.input:focus {
+  border-color: var(--bb-purple);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, .15);
+}
+.input.invalid { border-color: var(--bb-danger); }
+textarea.input { resize: vertical; min-height: 96px; }
+
+.field-error { color: var(--bb-danger); font-size: .8rem; margin-top: .3rem; }
+.field-hint { color: var(--bb-faint); font-size: .8rem; margin-top: .3rem; }
+
+/* ---------- اجزای مشترک ---------- */
+.card {
+  background: var(--bb-surface);
+  border: 1px solid var(--bb-border);
+  border-radius: var(--bb-radius);
+  box-shadow: var(--bb-shadow);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  background: var(--bb-lav-100);
+  color: var(--bb-deep);
+  border-radius: 999px;
+  padding: .12rem .7rem;
+  font-size: .78rem;
+  font-weight: 600;
+}
+.chip-muted { background: #f1f5f9; color: var(--bb-muted); }
+
+/* ---------- چیدمان صفحه‌های محتوایی ---------- */
+.page {
+  padding: 1.6rem 1.25rem 3rem;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+.page.narrow { max-width: 800px; }
+.page-head { margin-bottom: 1.4rem; }
+.page-head h1 { font-size: 1.45rem; font-weight: 800; }
+.page-head p { color: var(--bb-muted); margin-top: .25rem; font-size: .95rem; }
+
+:focus-visible { outline: 2px solid var(--bb-purple); outline-offset: 2px; }
+
+::selection { background: var(--bb-lav-200); }
+
+/* اسکرول‌بار ظریف */
+* { scrollbar-width: thin; scrollbar-color: var(--bb-lav-300) transparent; }

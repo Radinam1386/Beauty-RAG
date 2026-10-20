@@ -1,0 +1,7 @@
+sqlalchemy[asyncio]>=2.0
+asyncpg
+alembic
+pydantic-settings
+httpx
+pgvector
+pytest
