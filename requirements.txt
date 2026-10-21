@@ -5,5 +5,3 @@ pydantic-settings
 httpx
 pgvector
 pytest
-fastapi
-uvicorn
