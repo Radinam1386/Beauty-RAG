@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     llm_read_timeout: float = 60.0
     llm_max_retries: int = 3
 
+    
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -5,6 +5,8 @@ dependencies = [
   "pydantic-settings",
   "httpx",
   "pgvector",
+  "fastapi",
+  "uvicorn",
 ]
 
 [project.optional-dependencies]
