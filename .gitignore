@@ -1,6 +1,8 @@
 venv*
-env*
+env/
 backend/venv
-test.txt__pycache__/
+test.txt
+__pycache__/
 *.pyc
 BeautyRAG_Sources
+.env

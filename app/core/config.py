@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     llm_read_timeout: float = 60.0
     llm_max_retries: int = 3
 
+    # Spring Boot
+spring_boot_base_url: str = "http://localhost:8080"
+spring_boot_timeout: float = 10.0
+
     
 
 
