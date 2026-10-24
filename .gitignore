@@ -1,7 +1,6 @@
 venv*
 env/
 backend/venv
-test.txt
 __pycache__/
 *.pyc
 BeautyRAG_Sources
