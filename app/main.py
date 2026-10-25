@@ -1,6 +1,7 @@
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from app.api.v1.routes.spring_boot import router as spring_boot_router
 
 from fastapi import FastAPI
 
@@ -33,3 +34,4 @@ app = FastAPI(
 )
 
 app.include_router(health_router)
+app.include_router(spring_boot_router,prefix="/api/v1")
