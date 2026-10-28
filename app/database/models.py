@@ -24,20 +24,28 @@ class Conversation(Base):
     __tablename__ = "conversations"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=func.gen_random_uuid(),
     )
-    owner_type: Mapped[str] = mapped_column(String(10))  # 'guest' | 'user'
+    owner_type: Mapped[str] = mapped_column(String(10))
     external_user_id: Mapped[str | None] = mapped_column(String(64))
     guest_session_id: Mapped[str | None] = mapped_column(String(64))
     title: Mapped[str | None] = mapped_column(String(200))
+
     status: Mapped[str] = mapped_column(
-        String(10), server_default=text("'active'")
-    )  # 'active' | 'archived'
+        String(10),
+        server_default=text("'active'"),
+    )
+
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        DateTime(timezone=True),
+        server_default=func.now(),
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
     )
 
     messages: Mapped[list["Message"]] = relationship(
@@ -48,9 +56,14 @@ class Conversation(Base):
     )
 
     __table_args__ = (
-        CheckConstraint("owner_type IN ('guest', 'user')", name="owner_type"),
-        CheckConstraint("status IN ('active', 'archived')", name="status"),
-        # هر مکالمه دقیقاً یک مالک معتبر دارد
+        CheckConstraint(
+            "owner_type IN ('guest', 'user')",
+            name="owner_type",
+        ),
+        CheckConstraint(
+            "status IN ('active', 'archived')",
+            name="status",
+        ),
         CheckConstraint(
             "(owner_type = 'user' AND external_user_id IS NOT NULL "
             "AND guest_session_id IS NULL) OR "
@@ -58,19 +71,32 @@ class Conversation(Base):
             "AND external_user_id IS NULL)",
             name="owner_consistent",
         ),
-        Index("ix_conversations_user_updated", "external_user_id", text("updated_at DESC")),
-        Index("ix_conversations_guest_session", "guest_session_id"),
+        Index(
+            "ix_conversations_user_updated",
+            "external_user_id",
+            text("updated_at DESC"),
+        ),
+        Index(
+            "ix_conversations_guest_session",
+            "guest_session_id",
+        ),
     )
 
 
 class Message(Base):
     __tablename__ = "messages"
 
-    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
-    conversation_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE")
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        Identity(),
+        primary_key=True,
     )
-    role: Mapped[str] = mapped_column(String(10))  # system | user | assistant | tool
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+    )
+
+    role: Mapped[str] = mapped_column(String(10))
     content: Mapped[str | None] = mapped_column(Text)
     tool_calls: Mapped[list | None] = mapped_column(JSONB)
     tool_call_id: Mapped[str | None] = mapped_column(String(100))
@@ -78,15 +104,24 @@ class Message(Base):
     prompt_tokens: Mapped[int | None] = mapped_column(Integer)
     completion_tokens: Mapped[int | None] = mapped_column(Integer)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
+
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        DateTime(timezone=True),
+        server_default=func.now(),
     )
 
-    conversation: Mapped[Conversation] = relationship(back_populates="messages")
+    conversation: Mapped[Conversation] = relationship(
+        back_populates="messages",
+    )
 
     __table_args__ = (
         CheckConstraint(
-            "role IN ('system', 'user', 'assistant', 'tool')", name="role"
+            "role IN ('system', 'user', 'assistant', 'tool')",
+            name="role",
         ),
-        Index("ix_messages_conversation_id_id", "conversation_id", "id"),
+        Index(
+            "ix_messages_conversation_id_id",
+            "conversation_id",
+            "id",
+        ),
     )
