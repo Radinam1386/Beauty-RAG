@@ -88,6 +88,10 @@ def build_system_prompt(
         parts.append(LISTING_CREATE)
     if rag:
         parts.append(RAG_ADVICE)
-    if not (listing_search or listing_create or rag):
-        parts.append(NO_TOOLS_NOTE)
+    if not listing_search:
+        parts.append("در حال حاضر جستجوی واقعی آگهی فعال نیست؛ ادعای دسترسی به آن نکن.")
+    if not listing_create:
+        parts.append("ثبت آگهی فعال نیست؛ ادعای امکان ثبت یا ارسال درخواست نکن.")
+    if not rag:
+        parts.append("به پایگاه دانش سایت دسترسی نداری؛ منابع ساختگی ارائه نکن.")
     return "\n".join(parts)

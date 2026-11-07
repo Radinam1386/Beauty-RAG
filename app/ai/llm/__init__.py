@@ -9,3 +9,19 @@ from app.ai.llm.errors import (
     LLMTimeoutError,
 )
 from app.ai.llm.fake import FakeLLMClient
+
+__all__ = [
+    "LLMClient",
+    "LLMResponse",
+    "Message",
+    "Usage",
+    "OpenAICompatibleClient",
+    "create_llm_client",
+    "LLMAuthError",
+    "LLMBadResponseError",
+    "LLMError",
+    "LLMRateLimitError",
+    "LLMServerError",
+    "LLMTimeoutError",
+    "FakeLLMClient",
+]

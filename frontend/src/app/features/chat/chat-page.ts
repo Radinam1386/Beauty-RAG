@@ -19,6 +19,7 @@ export class ChatPage {
   protected readonly draft = signal('');
   protected readonly sending = signal(false);
   protected readonly loadingList = signal(true);
+  protected readonly errorMessage = signal('');
   protected readonly sidebarOpen = signal(false);
   protected readonly confirmDeleteId = signal<string | null>(null);
 
@@ -32,6 +33,7 @@ export class ChatPage {
   ];
 
   constructor() {
+    this.loadConversations();
     // اسکرول خودکار به آخرین پیام
     effect(() => {
       this.messages();
@@ -44,16 +46,20 @@ export class ChatPage {
 
   protected loadConversations(): void {
     this.loadingList.set(true);
-    this.chatApi.listConversations().subscribe(list => {
-      this.conversations.set(list);
-      this.loadingList.set(false);
+    this.chatApi.listConversations().subscribe({
+      next: list => { this.conversations.set(list); this.loadingList.set(false); },
+      error: () => { this.loadingList.set(false); this.errorMessage.set('بارگذاری گفتگوها ناموفق بود. اتصال به سرور را بررسی کنید.'); },
     });
   }
 
   protected select(conv: Conversation): void {
     this.activeId.set(conv.id);
     this.sidebarOpen.set(false);
-    this.chatApi.getMessages(conv.id).subscribe(msgs => this.messages.set(msgs));
+    this.messages.set([]);
+    this.chatApi.getMessages(conv.id).subscribe({
+      next: msgs => { if (this.activeId() === conv.id) this.messages.set(msgs); },
+      error: () => this.errorMessage.set('بارگذاری تاریخچه ناموفق بود.'),
+    });
   }
 
   protected newChat(): void {
@@ -86,6 +92,7 @@ export class ChatPage {
   protected send(): void {
     const text = this.draft().trim();
     if (!text || this.sending()) return;
+    this.errorMessage.set('');
     this.draft.set('');
     const el = this.composerEl()?.nativeElement;
     if (el) el.style.height = 'auto';
@@ -104,11 +111,12 @@ export class ChatPage {
       this.messages.update(list => [...list, userMsg]);
       this.chatApi.sendMessage(convId, text).subscribe({
         next: reply => {
-          this.messages.update(list => [...list, reply]);
+          if (this.activeId() === convId) this.messages.update(list => [...list, reply]);
+          this.loadConversations();
           this.sending.set(false);
         },
         error: () => {
-          this.messages.update(list => [
+          if (this.activeId() === convId) this.messages.update(list => [
             ...list,
             {
               id: uid(),
@@ -128,9 +136,13 @@ export class ChatPage {
       run(current);
     } else {
       // گفتگوی تازه: با اولین پیام ساخته می‌شود تا فهرست، شلوغ از گفتگوهای خالی نشود.
-      this.chatApi.createConversation(text).subscribe(c => {
-        this.conversations.update(list => [c, ...list]);
-        run(c.id);
+      this.chatApi.createConversation(text.slice(0, 200)).subscribe({
+        next: c => { this.conversations.update(list => [c, ...list]); run(c.id); },
+        error: () => {
+          this.draft.set(text);
+          this.sending.set(false);
+          this.errorMessage.set('ساخت گفتگو ناموفق بود. اتصال به سرور را بررسی کنید.');
+        },
       });
     }
   }
@@ -145,13 +157,13 @@ export class ChatPage {
 
   protected remove(conv: Conversation): void {
     this.confirmDeleteId.set(null);
-    this.chatApi.deleteConversation(conv.id).subscribe(() => {
+    this.chatApi.deleteConversation(conv.id).subscribe({ next: () => {
       this.conversations.update(list => list.filter(c => c.id !== conv.id));
       if (this.activeId() === conv.id) {
         this.activeId.set(null);
         this.messages.set([]);
       }
-    });
+    }, error: () => this.errorMessage.set('حذف گفتگو ناموفق بود.') });
   }
 
   protected faDate(iso: string): string {

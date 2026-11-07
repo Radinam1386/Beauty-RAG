@@ -1,7 +1,8 @@
 from app.ai.llm import Message
 from app.ai.prompts.system import build_system_prompt
 
-MAX_HISTORY = 5
+# سند پروژه: ارسال ۷ تا ۸ پیام اخیر به مدل
+MAX_HISTORY = 8
 
 
 def build_messages(

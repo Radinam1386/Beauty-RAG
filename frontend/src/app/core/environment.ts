@@ -1,18 +1,17 @@
 /**
- * تنظیمات اتصال فرانت‌اند به بکاند
+ * تنظیمات اتصال فرانتاند به بکاند
  *
- * مطابق سند برنامه‌ریزی پروژه:
- *  - سرویس هوش مصنوعی با Python/FastAPI اجرا می‌شود.
- *  - داده‌های آگهی از طریق APIهای Spring Boot سایت دریافت و ثبت می‌شود.
- *
- * تا زمان آماده شدن بکاند، `useMockApi: true` نگه دارید تا رابط کاربری با
- * داده‌های نمونه پیش‌نمایش شود. برای اتصال به سرویس واقعی، آدرس را تنظیم و
- * مقدار را false کنید.
+ * چت: FastAPI واقعی روی http://localhost:8000/api/v1
+ * آگهیها: تا فاز ۳ (اتصال به Spring Boot) روی Mock میماند
  */
 export const environment = {
   production: false,
   /** آدرس پایه سرویس هوش مصنوعی (FastAPI) */
-  apiBaseUrl: 'http://localhost:8000/api',
-  /** پیش‌نمایش رابط کاربری با داده نمونه، بدون بکاند */
-  useMockApi: true,
+  apiBaseUrl: 'http://localhost:8000/api/v1',
+  /** چت واقعی */
+  useMockChatApi: false,
+  /** آگهیها هنوز Mock — فاز ۳ */
+  useMockListingsApi: false,
+  /** سازگاری با کد قبلی */
+  useMockApi: false,
 };

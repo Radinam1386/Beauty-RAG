@@ -4,6 +4,7 @@ import { Observable, of } from 'rxjs';
 import { delay } from 'rxjs';
 
 import { environment } from './environment';
+import { IdentityService } from './identity.service';
 import { ListingCategory, ListingRequestDraft, ListingRequestResult, ListingSummary, uid } from './models';
 
 /**
@@ -19,7 +20,7 @@ export abstract class ListingsApi {
 export const LISTINGS_API = new InjectionToken<ListingsApi>('LISTINGS_API');
 
 export function provideListingsApi() {
-  return environment.useMockApi
+  return environment.useMockListingsApi
     ? { provide: LISTINGS_API, useClass: MockListingsApi }
     : { provide: LISTINGS_API, useClass: HttpListingsApi };
 }
@@ -28,22 +29,27 @@ export function provideListingsApi() {
 @Injectable()
 export class HttpListingsApi extends ListingsApi {
   private readonly http = inject(HttpClient);
+  private readonly identity = inject(IdentityService);
   private readonly base = environment.apiBaseUrl;
 
+  private get headers() {
+    return this.identity.headers();
+  }
+
   getCategories(): Observable<ListingCategory[]> {
-    return this.http.get<ListingCategory[]>(`${this.base}/listings/categories`);
+    return this.http.get<ListingCategory[]>(`${this.base}/listings/categories`, { headers: this.headers });
   }
 
   search(query: string, categoryId?: string | null): Observable<ListingSummary[]> {
     return this.http.post<ListingSummary[]>(`${this.base}/listings/search`, {
       query,
       categoryId: categoryId ?? null,
-    });
+    }, { headers: this.headers });
   }
 
   submitRequest(draft: ListingRequestDraft): Observable<ListingRequestResult> {
     // ثبت نهایی از مسیر Spring Boot انجام می‌شود و داده‌ها مجدداً اعتبارسنجی می‌شوند.
-    return this.http.post<ListingRequestResult>(`${this.base}/listing-requests`, draft);
+    return this.http.post<ListingRequestResult>(`${this.base}/listing-requests`, draft, { headers: this.headers });
   }
 }
 

@@ -1,22 +1,19 @@
 import { Injectable, InjectionToken, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
-import { delay } from 'rxjs';
+import { delay, map } from 'rxjs';
 
 import { environment } from './environment';
-import { ChatMessage, Conversation, uid } from './models';
+import { ChatMessage, Conversation } from './models';
+import { IdentityService } from './identity.service';
 import { SAMPLE_LISTINGS } from './listing.service';
 
 /**
- * قرارداد ارتباط فرانت‌اند با سرویس چت.
- * مطابق فاز ۲ سند پروژه: ساخت گفتگو، ثبت پیام، تاریخچه و حذف گفتگو.
- * در نسخه نهایی، در صورت پشتیبانی سرویس، ارسال پیام باید به Streaming ارتقا یابد.
- *
- * این رابط احراز هویت ندارد؛ فرانت قرار است داخل سایت اصلی سوار شود و هویت
- * کاربر از طریق کوکی/توکن میزبان به درخواست‌های HTTP ضمیمه می‌شود.
+ * قرارداد ارتباط فرانت‌اند با سرویس چت — فاز ۲.
+ * مطابق FastAPI: /api/v1/conversations
  */
 export abstract class ChatApi {
-  abstract listConversations(): Observable<Conversation[]>;
+  abstract listConversations(page?: number): Observable<Conversation[]>;
   abstract createConversation(title: string): Observable<Conversation>;
   abstract getMessages(conversationId: string): Observable<ChatMessage[]>;
   abstract sendMessage(conversationId: string, text: string): Observable<ChatMessage>;
@@ -26,37 +23,53 @@ export abstract class ChatApi {
 export const CHAT_API = new InjectionToken<ChatApi>('CHAT_API');
 
 export function provideChatApi() {
-  return environment.useMockApi
+  return environment.useMockChatApi
     ? { provide: CHAT_API, useClass: MockChatApi }
     : { provide: CHAT_API, useClass: HttpChatApi };
 }
 
-/** پیاده‌سازی واقعی — نقاط اتصال به FastAPI */
+/** پیاده‌سازی واقعی FastAPI */
 @Injectable()
 export class HttpChatApi extends ChatApi {
   private readonly http = inject(HttpClient);
+  private readonly identity = inject(IdentityService);
   private readonly base = environment.apiBaseUrl;
 
-  listConversations(): Observable<Conversation[]> {
-    return this.http.get<Conversation[]>(`${this.base}/conversations`);
+  private get headers() {
+    return this.identity.headers();
+  }
+
+  listConversations(page = 1): Observable<Conversation[]> {
+    return this.http
+      .get<any>(`${this.base}/conversations`, {
+        headers: this.headers,
+        params: { page: String(page), pageSize: '50' },
+      })
+      .pipe(map((res) => res?.items ?? []));
   }
 
   createConversation(title: string): Observable<Conversation> {
-    return this.http.post<Conversation>(`${this.base}/conversations`, { title });
+    return this.http.post<Conversation>(`${this.base}/conversations`, { title }, { headers: this.headers });
   }
 
   getMessages(conversationId: string): Observable<ChatMessage[]> {
-    return this.http.get<ChatMessage[]>(`${this.base}/conversations/${conversationId}/messages`);
-  }
-
-  sendMessage(conversationId: string, text: string): Observable<ChatMessage> {
-    return this.http.post<ChatMessage>(`${this.base}/conversations/${conversationId}/messages`, {
-      content: text,
+    return this.http.get<ChatMessage[]>(`${this.base}/conversations/${conversationId}/messages`, {
+      headers: this.headers,
     });
   }
 
+  sendMessage(conversationId: string, text: string): Observable<ChatMessage> {
+    return this.http
+      .post<any>(
+        `${this.base}/conversations/${conversationId}/messages`,
+        { content: text },
+        { headers: this.headers },
+      )
+      .pipe(map((res) => res?.assistantMessage as ChatMessage));
+  }
+
   deleteConversation(conversationId: string): Observable<void> {
-    return this.http.delete<void>(`${this.base}/conversations/${conversationId}`);
+    return this.http.delete<void>(`${this.base}/conversations/${conversationId}`, { headers: this.headers });
   }
 }
 
@@ -65,7 +78,7 @@ function shortenTitle(t: string): string {
   return clean.length > 34 ? clean.slice(0, 34) + '…' : clean;
 }
 
-/** پیاده‌سازی نمونه برای پیش‌نمایش رابط کاربری بدون بکاند (تاریخچه در localStorage) */
+/** پیاده‌سازی نمونه برای پیش‌نمایش رابط کاربری بدون بکاند */
 @Injectable()
 export class MockChatApi extends ChatApi {
   private read<T>(key: string, fallback: T): T {
@@ -132,15 +145,9 @@ export class MockChatApi extends ChatApi {
       conv.updatedAt = now;
       this.write(this.convKey(), convs);
     }
-    // تأخیر کوتاه برای شبیه‌سازی زمان پاسخ مدل
     return of(reply).pipe(delay(900));
   }
 
-  /**
-   * پاسخ‌های نمونه برای نمایش سناریوهای اصلی سند پروژه:
-   * جستجوی آگهی (Tool Calling) و پاسخ مستند با منبع (RAG).
-   * در نسخه واقعی، پاسخ از مدل زبانی می‌آید.
-   */
   private buildReply(text: string): ChatMessage {
     const t = text.trim();
     const base = { id: uid(), role: 'assistant' as const, createdAt: new Date().toISOString() };
@@ -167,4 +174,10 @@ export class MockChatApi extends ChatApi {
       content: 'من دستیار هوشمند BeautyBoss هستم و در این کارها می‌توانم کمک کنم:\n• جستجوی آگهی‌های خدمات زیبایی سایت\n• پاسخ به پرسش‌های مراقبت پوست و مو با ذکر منبع\nکافی است درخواستتان را بنویسید.',
     };
   }
+}
+
+function uid(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
