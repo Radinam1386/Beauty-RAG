@@ -12,6 +12,7 @@ os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:
 os.environ.setdefault("LLM_BASE_URL", "http://llm.test/v1")
 os.environ.setdefault("LLM_API_KEY", "test-key")
 os.environ.setdefault("LLM_MODEL", "test-model")
+os.environ.setdefault("CHAT_HISTORY_LIMIT", "8")
 os.environ.setdefault("SPRING_BOOT_BASE_URL", "http://spring.test")
 
 from fastapi import FastAPI  # noqa: E402
