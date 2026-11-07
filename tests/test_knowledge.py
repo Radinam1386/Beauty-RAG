@@ -1,3 +1,7 @@
+import logging
+
+from app.ai.prompts.system import KNOWLEDGE_END, KNOWLEDGE_START, build_system_prompt
+from app.knowledge.loader import load_knowledge
 from app.knowledge.store import search_knowledge, get_article
 from app.tools.knowledge import build_knowledge_tools
 from app.tools.base import ToolRegistry
@@ -28,3 +32,46 @@ def test_tool_search():
     result = asyncio.run(reg.dispatch("search_knowledge", {"query": "ضدآفتاب"}))
     assert not result.is_error
     assert "ضدآفتاب" in result.content
+
+
+# --- مرحله A: دانش ثابت از پوشه knowledge/ ---
+
+
+def test_load_knowledge_reads_markdown_files():
+    text = load_knowledge()
+    assert text.strip()
+    assert "راهنمای سایت BeautyBoss" in text
+    assert "راهنمای استفاده از محصولات" in text
+    assert len(text) > 1000
+
+
+def test_load_knowledge_missing_dir_returns_empty(tmp_path):
+    assert load_knowledge(tmp_path / "nope") == ""
+
+
+def test_load_knowledge_empty_dir_returns_empty(tmp_path):
+    assert load_knowledge(tmp_path) == ""
+
+
+def test_load_knowledge_warns_when_large(tmp_path, caplog):
+    (tmp_path / "big.md").write_text("## بخش\n" + "x" * 20_001, encoding="utf-8")
+    with caplog.at_level(logging.WARNING):
+        text = load_knowledge(tmp_path)
+    assert len(text) > 20_000
+    assert "RAG" in caplog.text
+
+
+def test_system_prompt_contains_knowledge_block():
+    prompt = build_system_prompt()
+    assert KNOWLEDGE_START in prompt
+    assert KNOWLEDGE_END in prompt
+    assert prompt.index(KNOWLEDGE_START) < prompt.index(KNOWLEDGE_END)
+    block = prompt.split(KNOWLEDGE_START, 1)[1].split(KNOWLEDGE_END, 1)[0]
+    assert "ضدآفتاب" in block
+    assert "TODO(team)" in block
+
+
+def test_system_prompt_without_knowledge_has_no_block():
+    prompt = build_system_prompt(knowledge="")
+    assert KNOWLEDGE_START not in prompt
+    assert "در دسترس نیست" in prompt

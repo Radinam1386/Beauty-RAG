@@ -10,7 +10,9 @@ from __future__ import annotations
 import re
 from typing import Any
 
-ZWNJ = "\u200c"
+from app.knowledge.sources import get_source, normalize, search_sources
+
+MAX_RESULTS = 8
 
 KNOWLEDGE: list[dict[str, Any]] = [
     {
@@ -125,18 +127,11 @@ KNOWLEDGE: list[dict[str, Any]] = [
 ]
 
 
-def normalize(s: str) -> str:
-    s = (s or "").replace(ZWNJ, " ").replace("ي", "ی").replace("ك", "ک")
-    s = s.replace("آ", "ا").replace("أ", "ا").replace("إ", "ا")
-    s = re.sub(r"[\u064B-\u0652]", "", s)
-    return s.lower().strip()
-
-
 def get_article(article_id: str) -> dict[str, Any] | None:
     for item in KNOWLEDGE:
         if item["id"] == article_id:
             return dict(item)
-    return None
+    return get_source(article_id)
 
 
 def search_knowledge(query: str) -> list[dict[str, Any]]:
@@ -163,4 +158,7 @@ def search_knowledge(query: str) -> list[dict[str, Any]]:
         if score > 0:
             results.append((score, item))
     results.sort(key=lambda x: x[0], reverse=True)
-    return [dict(item) for _, item in results]
+    merged = [dict(item) for _, item in results]
+    # منابع رسمی دانلودشده (FDA/NIH/... و منابع فارسی) هم جستجو می‌شوند
+    merged.extend(search_sources(query))
+    return merged[:MAX_RESULTS]

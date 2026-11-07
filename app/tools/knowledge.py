@@ -55,8 +55,9 @@ def build_knowledge_tools() -> list[Tool]:
         Tool(
             name="search_knowledge",
             description=(
-                "جستجو در راهنمای مراقبت پوست، مو، ناخن و آرایش BeautyBoss. "
-                "پاسخ را بر اساس نتیجه این ابزار بده و منبع را ذکر کن. "
+                "جستجو در راهنمای مراقبت پوست، مو، ناخن و آرایش BeautyBoss و منابع رسمی "
+                "(FDA، NIH/MedlinePlus، Cleveland Clinic، ECHA و منابع فارسی). "
+                "پاسخ را بر اساس نتیجه این ابزار بده و منبع و لینک را ذکر کن. "
                 "برای تشخیص یا درمان پزشکی شخصی، ارجاع به متخصص بده."
             ),
             parameters={

@@ -19,9 +19,10 @@ class Settings(BaseSettings):
     llm_max_retries: int = 3
     llm_use_fake: bool = False
 
-    # Spring Boot
-    spring_boot_base_url: str = "http://localhost:8080"
+    # سایت سایت / بک‌اند Spring Boot
+    spring_boot_base_url: str = "https://api.beautyboss.ir"
     spring_boot_timeout: float = 10.0
+    beautyboss_site_url: str = "https://beautyboss.ir"
 
     chat_history_limit: int = 8
     chat_max_message_chars: int = 8000
@@ -31,7 +32,7 @@ class Settings(BaseSettings):
     guest_session_max_age: int = 60 * 60 * 24 * 30 
     user_id_header: str = "X-User-Id"
     guest_session_header: str = "X-Guest-Session-Id"
-    enable_listing_tools: bool = False  
+    enable_listing_tools: bool = True
     enable_knowledge_tools: bool = True
     cors_origins: str = "http://localhost:4200,http://127.0.0.1:4200,http://localhost:8100,http://localhost:3000"
 

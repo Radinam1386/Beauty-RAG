@@ -24,8 +24,9 @@ from app.chat.exceptions import (
 )
 from app.chat.repository import ChatRepository
 from app.core.config import get_settings
-from app.listings.store import search_listings
+from app.integrations.spring_boot.client import SpringBootError
 from app.knowledge.store import search_knowledge
+from app.listings.service import ListingService
 from app.database.models import Conversation, Message
 from app.tools.base import ToolRegistry
 
@@ -48,10 +49,12 @@ class ChatService:
         repository: ChatRepository,
         llm: LLMClient,
         tools: ToolRegistry | None = None,
+        listing_service: ListingService | None = None,
     ) -> None:
         self.repo = repository
         self.llm = llm
         self.tools = tools
+        self.listing_service = listing_service or ListingService()
         self.settings = get_settings()
         self.listing_intent = re.compile(
             r"(آگهی|agahi|سالن|آرایشگاه|ونک|سعادت|جستجوی آگهی|دنبال|پیدا کن|رنگ مو|میکاپ|ناخن|کاشت|مژه|لیفت)"
@@ -150,8 +153,14 @@ class ChatService:
         pre_listings: list = []
         pre_sources: list = []
         pre_articles: list = []
-        if self.listing_intent.search(text):
-            pre_listings = search_listings(text)
+        # اگر ابزار جستجو فعال است، نتیجه از خود ابزار می‌آید تا با کارت‌های UI یکی باشد.
+        has_listing_tool = bool(self.tools and "search_listings" in self.tools.names())
+        if self.listing_intent.search(text) and not has_listing_tool:
+            try:
+                pre_listings = await self.listing_service.search(text)
+            except SpringBootError:
+                logger.warning("live listing search failed for conversation %s", conv.id)
+                pre_listings = []
             if pre_listings:
                 history = list(history)
                 history[-1] = {
@@ -174,7 +183,7 @@ class ChatService:
                     "role": "user",
                     "content": (
                         text
-                        + "\n\n[مقالات راهنمای BeautyBoss — پاسخ را بر اساس این منابع بده و منبع را ذکر کن. اگر کافی نبود صادقانه بگو]\n"
+                        + "\n\n[منابع دانش BeautyBoss (راهنمای داخلی و منابع رسمی مثل FDA/NIH) — پاسخ را بر اساس همین منابع بده، منبع و لینک را ذکر کن و اگر کافی نبود صادقانه بگو]\n"
                         + json.dumps(pre_articles, ensure_ascii=False)
                     ),
                 }

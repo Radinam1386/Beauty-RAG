@@ -12,6 +12,8 @@ from app.api.v1.routes.spring_boot import router as spring_boot_router
 from app.core.config import get_settings
 from app.database.session import dispose_engine
 from app.integrations.spring_boot.client import SpringBootClient
+from app.knowledge.loader import load_knowledge
+from app.listings.service import ListingService
 from app.ai.llm import FakeLLMClient, LLMClient, create_llm_client
 from app.tools.base import ToolRegistry
 from app.tools.registry import default_registry
@@ -20,6 +22,9 @@ from app.tools.registry import default_registry
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings = get_settings()
+
+    # دانش ثابت یک بار موقع شروع خوانده و اندازه‌اش لاگ می‌شود (cache شده)
+    load_knowledge()
 
     spring_boot_client = SpringBootClient(
         base_url=settings.spring_boot_base_url,
@@ -31,6 +36,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         llm_client: LLMClient = create_llm_client()
     tool_registry: ToolRegistry = default_registry(
         include_listing_tools=settings.enable_listing_tools,
+        listing_service=ListingService(client=spring_boot_client),
     )
 
     app.state.spring_boot_client = spring_boot_client

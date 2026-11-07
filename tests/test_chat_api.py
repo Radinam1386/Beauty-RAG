@@ -11,9 +11,12 @@ async def test_real_dependency_wiring(fake_repo, fake_llm):
     from httpx import ASGITransport, AsyncClient
     from app.api.dependencies import get_chat_repository, get_llm_client
     from app.api.v1.routes.chat import router
+    from app.integrations.spring_boot.client import SpringBootClient
 
     application = FastAPI()
     application.include_router(router, prefix="/api/v1")
+    # مثل lifespan برنامه: کلاینت سایت در state قرار می‌گیرد
+    application.state.spring_boot_client = SpringBootClient(base_url="http://spring.test")
     application.dependency_overrides[get_chat_repository] = lambda: fake_repo
     application.dependency_overrides[get_llm_client] = lambda: fake_llm
     async with AsyncClient(transport=ASGITransport(app=application), base_url="http://test") as client:
@@ -24,6 +27,8 @@ async def test_real_dependency_wiring(fake_repo, fake_llm):
             json={'content': 'سلام'}, headers={'X-Guest-Session-Id': 'test-guest'},
         )
         assert response.status_code == 200
+
+    await application.state.spring_boot_client.aclose()
 
 
 async def test_create_conversation_201(client):
