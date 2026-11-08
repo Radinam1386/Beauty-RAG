@@ -1,19 +1,13 @@
-/**
- * تنظیمات اتصال فرانتاند به بکاند
- *
- * چت: FastAPI واقعی روی http://localhost:8000/api/v1
- * آگهیها: تا فاز ۳ (اتصال به Spring Boot) روی Mock میماند
- */
 export const environment = {
   production: false,
-  /** آدرس پایه سرویس هوش مصنوعی (FastAPI) */
-  apiBaseUrl: 'http://localhost:8000/api/v1',
-  /** کلید localStorage که سایت اصلی توکن JWT را در آن می‌گذارد */
+  /**
+   * آدرس پایه سرویس هوش مصنوعی (FastAPI)
+   * بر اساس hostname مرورگر ساخته می‌شود تا دسترسی با IP محلی (LAN) هم کار کند:
+   * اگر با http://192.168.x.x:4200 باز شود، API هم همان IP را صدا می‌زند.
+   */
+  apiBaseUrl: `http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:8000/api/v1`,
   authTokenKey: 'bbai:access-token',
-  /** چت واقعی */
   useMockChatApi: false,
-  /** آگهیها هنوز Mock — فاز ۳ */
   useMockListingsApi: false,
-  /** سازگاری با کد قبلی */
   useMockApi: false,
 };

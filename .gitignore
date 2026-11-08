@@ -5,3 +5,5 @@ __pycache__/
 *.pyc
 BeautyRAG_Sources
 .env
+.*
+PROJECT_STATUS_FA.md
