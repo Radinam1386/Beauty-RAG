@@ -1,44 +1,115 @@
-"""Chat API — فاز ۲.
+"""Chat API — فاز ۲ و ۴.
 
-قرارداد با فرانت‌اند:
-- GET    /api/v1/conversations                 فهرست صفحه‌بندی‌شده
-- POST   /api/v1/conversations                 ساخت گفتگو
-- GET    /api/v1/conversations/{id}/messages   تاریخچه
-- POST   /api/v1/conversations/{id}/messages   ارسال پیام و گرفتن پاسخ
-- DELETE /api/v1/conversations/{id}            حذف (آرشیو)
-- POST   /api/v1/conversations/{id}/messages/stream   Streaming (SSE)
+- POST /chat                                  شروع یا ادامه چت ذخیره‌شده
+- GET/POST /conversations                     گفتگوهای متعلق به کاربر یا نشست مهمان
+- GET  /conversations/{id}/messages
+- POST /conversations/{id}/messages
+- DELETE /conversations/{id}
+- POST /conversations/{id}/messages/stream
 """
 
 import json
 import logging
 import uuid
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
-from app.api.dependencies import ChatServiceDep, IdentityDep
 from app.ai.llm.errors import LLMError
+from app.api.dependencies import BudgetDep, ChatServiceDep
 from app.api.v1.schemas.chat import (
-    ListingSummaryOut,
-    SourceOut,
+    ChatIn,
+    ChatOut,
     ConversationCreate,
     ConversationOut,
+    ListingSummaryOut,
     MessageCreate,
     MessageOut,
     PaginatedConversations,
     SendMessageOut,
+    SourceOut,
 )
+from app.auth.dependencies import IdentityDep
 from app.chat.exceptions import (
+    ChatError,
     ConversationAccessError,
     ConversationNotFound,
     EmptyMessageError,
     MessageTooLongError,
 )
+from app.core.config import get_settings
+from app.limits import enforce_rate_limit
 
 logger = logging.getLogger(__name__)
 
+# دسترسی به هر گفتگو در ChatService و repository بر اساس مالک آن بررسی می‌شود.
 router = APIRouter(tags=["Chat"])
+public_router = APIRouter(tags=["Chat"])
+
+
+def _chat_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, ConversationNotFound):
+        return HTTPException(status_code=404, detail="گفتگو پیدا نشد")
+    if isinstance(exc, ConversationAccessError):
+        return HTTPException(status_code=404, detail="گفتگو پیدا نشد")
+    if isinstance(exc, EmptyMessageError):
+        return HTTPException(status_code=422, detail="متن پیام خالی است")
+    if isinstance(exc, MessageTooLongError):
+        return HTTPException(status_code=422, detail="متن پیام بیش از حد مجاز است")
+    if isinstance(exc, LLMError):
+        logger.warning("LLM error: %s", type(exc).__name__)
+        return HTTPException(status_code=502, detail="سرویس مدل زبانی در دسترس نیست")
+    if isinstance(exc, OperationalError):
+        logger.exception("DB connection error")
+        return HTTPException(status_code=503, detail="سرویس دیتابیس در دسترس نیست")
+    return HTTPException(status_code=500, detail="خطای داخلی")
+
+
+def _listings_out(items: list | None) -> list[ListingSummaryOut] | None:
+    return [ListingSummaryOut(**item) for item in items] if items else None
+
+
+def _sources_out(items: list | None) -> list[SourceOut] | None:
+    return [SourceOut(**item) for item in items] if items else None
+
+
+@public_router.post("/chat", response_model=ChatOut)
+async def chat(
+    payload: ChatIn,
+    request: Request,
+    identity: IdentityDep,
+    service: ChatServiceDep,
+    budget: BudgetDep,
+):
+    """شروع یا ادامه گفتگو؛ پیام مهمان و کاربر هر دو ذخیره می‌شوند."""
+    enforce_rate_limit(request, identity, get_settings())
+    await budget.check()
+
+    try:
+        if payload.conversation_id is not None:
+            result = await service.send_message(
+                identity, payload.conversation_id, payload.content
+            )
+        else:
+            conv = await service.create_conversation(identity)
+            result = await service.send_message(identity, conv.id, payload.content)
+    except (ChatError, LLMError, OperationalError) as exc:
+        raise _chat_error(exc) from None
+    except SQLAlchemyError:
+        logger.exception("DB error on chat")
+        raise HTTPException(status_code=500, detail="خطای ذخیره‌سازی") from None
+
+    await budget.record(
+        result.llm.usage.prompt_tokens, result.llm.usage.completion_tokens
+    )
+    return ChatOut(
+        conversation_id=result.conversation.id,
+        content=result.assistant_message.content or "",
+        model=result.assistant_message.model,
+        listings=_listings_out(result.listings),
+        sources=_sources_out(result.sources),
+    )
 
 
 @router.get("/conversations", response_model=PaginatedConversations)
@@ -102,27 +173,24 @@ async def list_messages(
 async def send_message(
     conversation_id: uuid.UUID,
     payload: MessageCreate,
+    request: Request,
     identity: IdentityDep,
     service: ChatServiceDep,
+    budget: BudgetDep,
 ):
+    enforce_rate_limit(request, identity, get_settings())
+    await budget.check()
     try:
         result = await service.send_message(identity, conversation_id, payload.content)
-    except ConversationNotFound:
-        raise HTTPException(status_code=404, detail="گفتگو پیدا نشد") from None
-    except EmptyMessageError:
-        raise HTTPException(status_code=422, detail="متن پیام خالی است") from None
-    except MessageTooLongError:
-        raise HTTPException(status_code=413, detail="متن پیام بیش از حد مجاز است") from None
-    except LLMError as exc:
-        logger.warning("LLM error on send: %s", type(exc).__name__)
-        raise HTTPException(status_code=502, detail="سرویس مدل زبانی در دسترس نیست") from exc
-    except OperationalError as exc:
-        logger.exception("DB connection error on send")
-        raise HTTPException(status_code=503, detail="سرویس دیتابیس در دسترس نیست") from exc
+    except (ChatError, LLMError, OperationalError) as exc:
+        raise _chat_error(exc) from None
     except SQLAlchemyError:
         logger.exception("DB error on send")
         raise HTTPException(status_code=500, detail="خطای ذخیره‌سازی") from None
 
+    await budget.record(
+        result.llm.usage.prompt_tokens, result.llm.usage.completion_tokens
+    )
     assistant = MessageOut.model_validate(result.assistant_message)
     if result.listings:
         assistant.listings = [ListingSummaryOut(**item) for item in result.listings]
@@ -155,10 +223,14 @@ async def delete_conversation(
 async def stream_message(
     conversation_id: uuid.UUID,
     payload: MessageCreate,
+    request: Request,
     identity: IdentityDep,
     service: ChatServiceDep,
+    budget: BudgetDep,
 ):
     """SSE: event=delta / done / error"""
+    enforce_rate_limit(request, identity, get_settings())
+    await budget.check()
 
     async def gen():
         try:

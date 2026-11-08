@@ -10,6 +10,7 @@ from app.chat.service import ChatService
 from app.core.config import get_settings
 from app.database.session import get_session
 from app.integrations.spring_boot.client import SpringBootClient
+from app.limits import DailyBudget
 from app.listings.service import ListingService
 from app.tools.base import ToolRegistry
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +34,13 @@ def get_chat_repository(
     return ChatRepository(session)
 
 
+def get_budget(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> DailyBudget:
+    """بودجه روزانه توکن؛ تست‌ها این را override می‌کنند."""
+    return DailyBudget(session, get_settings().daily_token_limit)
+
+
 def get_chat_service(
     repository: Annotated[ChatRepository, Depends(get_chat_repository)],
     llm: Annotated[LLMClient, Depends(get_llm_client)],
@@ -45,7 +53,7 @@ def get_chat_service(
     listing_service = ListingService(client=spring_boot_client)
     tools = default_registry(
         include_listing_tools=s.enable_listing_tools,
-        include_knowledge_tools=s.enable_knowledge_tools,
+        include_knowledge_tools=False,
         identity=identity,
         listing_service=listing_service,
     )
@@ -62,3 +70,4 @@ LLMDep = Annotated[LLMClient, Depends(get_llm_client)]
 ToolsDep = Annotated[ToolRegistry, Depends(get_tool_registry)]
 ChatServiceDep = Annotated[ChatService, Depends(get_chat_service)]
 IdentityDep = Annotated[Identity, Depends(get_identity)]
+BudgetDep = Annotated[DailyBudget, Depends(get_budget)]

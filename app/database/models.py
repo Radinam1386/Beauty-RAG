@@ -1,9 +1,10 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Identity,
@@ -118,4 +119,17 @@ class ListingRequest(Base):
     __table_args__ = (
         CheckConstraint("status IN ('review', 'submitted', 'rejected')", name="status"),
         Index("ix_listing_requests_user", "external_user_id", text("created_at DESC")),
+    )
+
+
+class DailyUsage(Base):
+    """مصرف روزانه LLM — برای سقف هزینه سراسری."""
+
+    __tablename__ = "daily_usage"
+
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    requests: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    total_tokens: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

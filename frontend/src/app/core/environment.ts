@@ -8,6 +8,8 @@ export const environment = {
   production: false,
   /** آدرس پایه سرویس هوش مصنوعی (FastAPI) */
   apiBaseUrl: 'http://localhost:8000/api/v1',
+  /** کلید localStorage که سایت اصلی توکن JWT را در آن می‌گذارد */
+  authTokenKey: 'bbai:access-token',
   /** چت واقعی */
   useMockChatApi: false,
   /** آگهیها هنوز Mock — فاز ۳ */

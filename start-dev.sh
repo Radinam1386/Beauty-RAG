@@ -19,7 +19,7 @@ env/bin/python -m alembic upgrade head
 
 # بک‌اند
 echo "starting backend..."
-env/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload &
+env/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload &
 BACK=$!
 
 # فرانت

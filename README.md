@@ -6,6 +6,22 @@
 
 ---
 
+## اجرای مستقل برای تست چت
+
+بعد از نصب وابستگی‌های Python و Node و تنظیم `.env`، PostgreSQL را روشن کنید و از ریشه پروژه اجرا کنید:
+
+```bash
+./start-dev.sh
+```
+
+سپس [صفحه چت](http://localhost:4200/chat) را باز کنید. برای تست نیازی به اتصال یا ورود به سایت اصلی نیست. اسکریپت migrationها را اجرا می‌کند و فرانت‌اند و بک‌اند را بالا می‌آورد؛ با `Ctrl+C` متوقف می‌شود. اگر PostgreSQL را با Docker اجرا می‌کنید، ابتدا `docker compose up -d db` را بزنید و مطمئن شوید `DATABASE_URL` به همان دیتابیس اشاره می‌کند.
+
+برای پاسخ واقعی، `LLM_USE_FAKE=false` و آدرس، مدل و کلید معتبر LLM را در `.env` تنظیم کنید. با `LLM_USE_FAKE=true` می‌توان بدون سرویس مدل، اتصال را با یک پاسخ ثابت آزمایشی بررسی کرد. تغییر `.env` نیاز به راه‌اندازی مجدد بک‌اند دارد.
+
+گفتگوهای مهمان با شناسه نشست مرورگر در دیتابیس ذخیره می‌شوند و پس از تازه‌سازی دوباره نمایش داده می‌شوند. برای بازیابی در همان مرورگر، داده‌های سایت را پاک نکنید. هنگام اتصال به سایت، آدرس API فرانت‌اند در `frontend/src/app/core/environment.ts` و `CORS_ORIGINS` بک‌اند باید با نشانی استقرار هماهنگ شوند.
+
+---
+
 ## ۱. پیش‌نیازها
 
 - Python (هر دو نفر **یک نسخه** استفاده کنید؛ سند پروژه ۳.۱۲ یا ۳.۱۳ را پیشنهاد می‌کند)
@@ -221,3 +237,46 @@ docker compose exec db psql -U beautyboss -d beautyboss    # ورود به دی�
 - [ ] کلاس LLM (`app/ai/llm/`) و `FakeLLMClient`
 - [ ] کلاینت واقعی با timeout و retry
 - [ ] تست‌ها و `scripts/llm_smoke.py`
+
+---
+
+## ۱۲. فاز ۴ — کاربر، امنیت و دیتابیس
+
+> راهنمای اتصال به سایت اصلی (توکن، JWKS، CORS، پیشوند API): [`docs/INTEGRATION.md`](docs/INTEGRATION.md)
+
+### هویت (JWT)
+- `Authorization: Bearer <jwt>` ← کاربر لاگین‌شده؛ بدون هدر ← مهمان؛ توکن خراب/منقضی ← ۴۰۱.
+- `user_id` فقط از claim توکن خوانده می‌شود (`JWT_USER_ID_CLAIM`، پیش‌فرض `sub`). هدر `X-User-Id` دیگر پذیرفته نمی‌شود.
+- تنظیمات env: `JWT_ALGORITHM`, `JWT_SECRET` (HS*) یا `JWT_PUBLIC_KEY` (RS*), `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_ROLE_CLAIM`.
+
+```bash
+./env/bin/python scripts/make_test_token.py --user 42 --minutes 60
+```
+
+### مهمان در برابر کاربر
+| | مهمان | لاگین‌شده |
+|---|---|---|
+| `POST /api/v1/chat` | ✅ ذخیره با شناسه نشست + `conversationId` | ✅ ذخیره + `conversationId` |
+| `/api/v1/conversations...` | ✅ فقط چت‌های همان نشست مهمان | ✅ فقط چت‌های همان کاربر (چت دیگران ۴۰۴) |
+
+شناسه نشست مهمان در مرورگر نگه داشته می‌شود تا گفتگوها بعد از بارگذاری دوباره قابل بازیابی باشند. درخواست جدید `/chat` یک گفتگو می‌سازد؛ برای ادامه، `conversationId` همان گفتگو را بفرستید. endpointهای `/conversations` نیز همین داده‌ها را نمایش می‌دهند.
+
+### محدودیت‌ها
+- `ANONYMOUS_RATE_PER_MINUTE=10`, `ANONYMOUS_RATE_PER_DAY=30`, `USER_RATE_PER_MINUTE=20`, `USER_RATE_PER_DAY=200` ← ۴۲۹ + `Retry-After`.
+- `CHAT_MAX_MESSAGE_CHARS=2000` ← ۴۲۲.
+- `DAILY_TOKEN_LIMIT` ← ۵۰۳ بدون فراخوانی LLM؛ مصرف در جدول `daily_usage` (migration `e1b7c4d9a2f3`).
+- **مهم:** rate limit در حافظه است و فقط با **یک worker** درست کار می‌کند. برای چند worker فقط `app/limits.py` را با Redis عوض کن.
+- `TRUST_PROXY_HEADERS=false` پیش‌فرض؛ فقط پشت reverse proxy مورد اعتماد `true` کن.
+
+### اجرا
+```bash
+docker compose up -d db
+./env/bin/python -m alembic upgrade head
+./env/bin/python -m uvicorn app.main:app --reload
+```
+
+```bash
+TOKEN=$(./env/bin/python scripts/make_test_token.py --user 42)
+curl -s localhost:8000/api/v1/chat -H 'content-type: application/json' -d '{"content":"سلام"}'
+curl -s localhost:8000/api/v1/chat -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' -d '{"content":"سلام"}'
+```

@@ -1,14 +1,17 @@
 import { Injectable } from '@angular/core';
 
+import { environment } from './environment';
+
 /**
- * شناسه نشست مهمان / کاربر برای هدرهای Chat API.
- * کاربر لاگین‌شده: سایت اصلی باید X-User-Id را ست کند (یا این سرویس از localStorage بخواند).
- * مهمان: شناسه در localStorage نگه داشته می‌شود.
+ * هویت درخواست‌های چت.
+ *
+ * کاربر لاگین‌شده: توکن JWT که سایت اصلی در localStorage (کلید environment.authTokenKey)
+ * می‌گذارد یا با setToken() به ما می‌دهد؛ آن را به‌صورت Authorization: Bearer می‌فرستیم.
+ * مهمان: شناسه نشست در localStorage نگه داشته می‌شود.
  */
 @Injectable({ providedIn: 'root' })
 export class IdentityService {
   private readonly guestKey = 'bbai:guest-session';
-  private readonly userKey = 'bbai:user-id';
 
   guestSessionId(): string {
     try {
@@ -23,25 +26,30 @@ export class IdentityService {
     }
   }
 
-  /** شناسه کاربر لاگین‌شده اگر سایت اصلی گذاشته باشد. */
-  externalUserId(): string | null {
+  /** توکن JWT سایت اصلی؛ null یعنی مهمان. */
+  token(): string | null {
     try {
-      return localStorage.getItem(this.userKey);
+      return localStorage.getItem(environment.authTokenKey);
     } catch {
       return null;
     }
   }
 
-  setExternalUserId(id: string | null): void {
+  /** سایت اصلی بعد از لاگین/رفرش توکن صدا می‌زند؛ خروج = null. */
+  setToken(token: string | null): void {
     try {
-      if (id) localStorage.setItem(this.userKey, id);
-      else localStorage.removeItem(this.userKey);
+      if (token) localStorage.setItem(environment.authTokenKey, token);
+      else localStorage.removeItem(environment.authTokenKey);
     } catch { /* ignore */ }
   }
 
+  isLoggedIn(): boolean {
+    return !!this.token();
+  }
+
   headers(): Record<string, string> {
-    const userId = this.externalUserId();
-    if (userId) return { 'X-User-Id': userId };
+    const token = this.token();
+    if (token) return { Authorization: `Bearer ${token}` };
     return { 'X-Guest-Session-Id': this.guestSessionId() };
   }
 }

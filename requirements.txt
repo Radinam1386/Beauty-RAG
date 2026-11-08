@@ -1,6 +1,7 @@
 sqlalchemy[asyncio]>=2.0
 asyncpg
 alembic
+pyjwt[crypto]>=2.8
 pydantic-settings
 httpx
 pgvector

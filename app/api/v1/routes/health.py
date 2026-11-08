@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.database.session import get_session
 
 router = APIRouter(tags=["Health"])
@@ -13,7 +14,7 @@ async def root():
         "name": "BeautyBoss AI",
         "docs": "/docs",
         "health": "/health",
-        "chat": "/api/v1/conversations",
+        "chat": f"{get_settings().api_prefix_clean}/conversations",
     }
 
 

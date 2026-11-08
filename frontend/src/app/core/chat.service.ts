@@ -71,6 +71,7 @@ export class HttpChatApi extends ChatApi {
   deleteConversation(conversationId: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/conversations/${conversationId}`, { headers: this.headers });
   }
+
 }
 
 function shortenTitle(t: string): string {

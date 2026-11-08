@@ -3,13 +3,13 @@ import json
 import pytest
 
 from app.ai.llm import FakeLLMClient
-from tests.conftest import FakeChatRepository, make_identity
+from tests.conftest import FakeBudget, FakeChatRepository, auth_headers, make_identity
 
 
 async def test_real_dependency_wiring(fake_repo, fake_llm):
     from fastapi import FastAPI
     from httpx import ASGITransport, AsyncClient
-    from app.api.dependencies import get_chat_repository, get_llm_client
+    from app.api.dependencies import get_budget, get_chat_repository, get_llm_client
     from app.api.v1.routes.chat import router
     from app.integrations.spring_boot.client import SpringBootClient
 
@@ -19,12 +19,15 @@ async def test_real_dependency_wiring(fake_repo, fake_llm):
     application.state.spring_boot_client = SpringBootClient(base_url="http://spring.test")
     application.dependency_overrides[get_chat_repository] = lambda: fake_repo
     application.dependency_overrides[get_llm_client] = lambda: fake_llm
+    application.dependency_overrides[get_budget] = lambda: FakeBudget()
+    headers = auth_headers("7")
     async with AsyncClient(transport=ASGITransport(app=application), base_url="http://test") as client:
-        response = await client.post('/api/v1/conversations', json={}, headers={'X-Guest-Session-Id': 'test-guest'})
+        response = await client.post('/api/v1/conversations', json={}, headers=headers)
         assert response.status_code == 201
+        assert response.json()["ownerType"] == "user"
         response = await client.post(
             f"/api/v1/conversations/{response.json()['id']}/messages",
-            json={'content': 'سلام'}, headers={'X-Guest-Session-Id': 'test-guest'},
+            json={'content': 'سلام'}, headers=headers,
         )
         assert response.status_code == 200
 
@@ -36,14 +39,14 @@ async def test_create_conversation_201(client):
     assert resp.status_code == 201
     body = resp.json()
     assert body["title"] == "گفتگوی من"
-    assert body["ownerType"] == "guest"  # camelCase
+    assert body["ownerType"] == "user"  # camelCase
     assert "createdAt" in body
     assert "id" in body
 
 
-async def test_list_conversations_paginated(client, fake_repo, guest):
+async def test_list_conversations_paginated(client, fake_repo, user):
     for i in range(5):
-        await fake_repo.create_conversation(guest, title=f"c{i}")
+        await fake_repo.create_conversation(user, title=f"c{i}")
     resp = await client.get("/api/v1/conversations", params={"page": 1, "pageSize": 2})
     assert resp.status_code == 200
     body = resp.json()
@@ -79,13 +82,13 @@ async def test_send_message_empty_422(client, fake_repo, guest):
 
 
 async def test_messages_of_other_owner_404(client, fake_repo, guest, user):
-    conv = await fake_repo.create_conversation(user, title="کاربر")
+    conv = await fake_repo.create_conversation(make_identity(True, "user-2"), title="کاربر دیگر")
     resp = await client.get(f"/api/v1/conversations/{conv.id}/messages")
     assert resp.status_code == 404
 
 
-async def test_delete_conversation_204(client, fake_repo, guest):
-    conv = await fake_repo.create_conversation(guest, title="حذف")
+async def test_delete_conversation_204(client, fake_repo, user):
+    conv = await fake_repo.create_conversation(user, title="حذف")
     resp = await client.delete(f"/api/v1/conversations/{conv.id}")
     assert resp.status_code == 204
     resp2 = await client.get(f"/api/v1/conversations/{conv.id}/messages")

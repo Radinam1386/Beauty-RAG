@@ -47,6 +47,30 @@ class MessageCreate(BaseModel):
         return v
 
 
+class ChatIn(CamelModel):
+    """ورودی چت برای شروع گفتگو یا ادامه با conversation_id."""
+
+    content: str = Field(min_length=1)
+    conversation_id: uuid.UUID | None = None
+
+    @field_validator("content")
+    @classmethod
+    def not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("متن پیام خالی است")
+        return v
+
+
+class ChatOut(CamelModel):
+    """پاسخ /chat؛ conversationId برای مهمان null است."""
+
+    conversation_id: uuid.UUID | None = None
+    content: str
+    model: str | None = None
+    listings: list["ListingSummaryOut"] | None = None
+    sources: list["SourceOut"] | None = None
+
+
 class SourceOut(CamelModel):
     title: str
     url: str | None = None

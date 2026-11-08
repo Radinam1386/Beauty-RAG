@@ -25,20 +25,48 @@ class Settings(BaseSettings):
     beautyboss_site_url: str = "https://beautyboss.ir"
 
     chat_history_limit: int = 8
-    chat_max_message_chars: int = 8000
+    chat_max_message_chars: int = 2000
     conversations_page_size: int = 20
     conversations_max_page_size: int = 50
     guest_cookie_name: str = "bb_guest_session"
     guest_session_max_age: int = 60 * 60 * 24 * 30 
-    user_id_header: str = "X-User-Id"
     guest_session_header: str = "X-Guest-Session-Id"
     enable_listing_tools: bool = True
     enable_knowledge_tools: bool = True
-    cors_origins: str = "http://localhost:4200,http://127.0.0.1:4200,http://localhost:8100,http://localhost:3000"
+    # پیش‌فرض بسته؛ فرانت واقعی را در env اضافه کن
+    cors_origins: str = ""
+
+    # JWT (توکن صادرشده توسط Spring Boot) — سرویس فقط اعتبارسنجی می‌کند
+    jwt_algorithm: str = "HS256"
+    jwt_jwks_url: str | None = None
+    jwt_secret: SecretStr | None = None
+    jwt_public_key: str | None = None
+    jwt_user_id_claim: str = "sub"
+    jwt_role_claim: str | None = None
+    jwt_issuer: str | None = None
+    jwt_audience: str | None = None
+
+    # محدودیت نرخ و هزینه
+    anonymous_rate_per_minute: int = 10
+    anonymous_rate_per_day: int = 30
+    user_rate_per_minute: int = 20
+    user_rate_per_day: int = 200
+    daily_token_limit: int = 2_000_000
+    trust_proxy_headers: bool = False
+    # پیشوند مسیر API؛ اگر سایت اصلی این سرویس را زیر مسیر دیگری mount می‌کند عوضش کن
+    api_prefix: str = "/api/v1"
 
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def api_prefix_clean(self) -> str:
+        """پیشوند مسیر بدون اسلش آخر (یا رشتهٔ خالی برای ریشه)."""
+        prefix = (self.api_prefix or "").strip()
+        if prefix in ("", "/"):
+            return ""
+        return "/" + prefix.strip("/")
 
 
 @lru_cache

@@ -25,12 +25,32 @@ from app.chat.exceptions import (
 from app.chat.repository import ChatRepository
 from app.core.config import get_settings
 from app.integrations.spring_boot.client import SpringBootError
-from app.knowledge.store import search_knowledge
 from app.listings.service import ListingService
 from app.database.models import Conversation, Message
 from app.tools.base import ToolRegistry
 
 logger = logging.getLogger(__name__)
+
+
+def _append_note(history: list[dict], note: str) -> list[dict]:
+    """شواهد (آگهی/منبع) را به آخرین پیام کاربر می‌چسباند."""
+    if not history:
+        return [{"role": "user", "content": note}]
+    out = [dict(m) for m in history]
+    last = out[-1]
+    out[-1] = {"role": "user", "content": f"{last.get('content') or ''}\n\n{note}"}
+    return out
+
+
+@dataclass(frozen=True)
+class ChatReply:
+    """پاسخ یک‌مرحله‌ای (بدون ذخیره) برای مهمان."""
+
+    content: str
+    model: str | None
+    listings: list
+    sources: list
+    llm: LLMResponse
 
 
 @dataclass(frozen=True)
@@ -58,9 +78,6 @@ class ChatService:
         self.settings = get_settings()
         self.listing_intent = re.compile(
             r"(آگهی|agahi|سالن|آرایشگاه|ونک|سعادت|جستجوی آگهی|دنبال|پیدا کن|رنگ مو|میکاپ|ناخن|کاشت|مژه|لیفت)"
-        )
-        self.knowledge_intent = re.compile(
-            r"(پوست|کرم|ضدآفتاب|مراقبت پوست|مراقبت مو|آکنه|جوش|ریزش|سرم|مرطوبکننده|شامپو|حساس|پاکسازی|خشک)"
         )
 
     async def create_conversation(self, identity: Identity, title: str | None = None) -> Conversation:
@@ -111,7 +128,7 @@ class ChatService:
 
     def _title_from_text(self, text: str) -> str:
         clean = " ".join(text.split())
-        return clean[:80] + ("…" if len(clean) > 80 else "")
+        return clean[:50] + ("…" if len(clean) > 50 else "")
 
     async def _history_for_model(self, conversation: Conversation) -> list[dict]:
         """پیام ذخیره‌شدهٔ تازه و تاریخچه، هر کدام فقط یک بار."""
@@ -127,6 +144,53 @@ class ChatService:
         while history and history[0]["role"] != "user":
             history.pop(0)
         return history
+
+    async def _augment(
+        self, history: list[dict], text: str
+    ) -> tuple[list[dict], list, list]:
+        """آگهی/منابع مرتبط را به پیام کاربر اضافه می‌کند؛ (تاریخچه، آگهی‌ها، منابع)."""
+        listings: list = []
+        sources: list = []
+        # اگر ابزار جستجو فعال است، نتیجه از خود ابزار می‌آید تا با کارت‌های UI یکی باشد.
+        has_listing_tool = bool(self.tools and "search_listings" in self.tools.names())
+        if self.listing_intent.search(text) and not has_listing_tool:
+            try:
+                listings = await self.listing_service.search(text)
+            except SpringBootError:
+                logger.warning("live listing search failed")
+                listings = []
+            if listings:
+                history = _append_note(
+                    history,
+                    "[نتایج جستجوی آگهی سایت BeautyBoss — فقط از این نتایج استفاده کن، "
+                    "قیمت و لینک را از همین‌ها بگو و آگهی نساز]\n"
+                    + json.dumps(listings, ensure_ascii=False),
+                )
+        return history, listings, sources
+
+    async def reply_anonymous(self, content: str) -> ChatReply:
+        """پاسخ یک‌مرحله‌ای مهمان: هیچ چیز در دیتابیس ذخیره نمی‌شود."""
+        text = self._validate_content(content)
+        history, listings, sources = await self._augment(
+            [{"role": "user", "content": text}], text
+        )
+        manager = ConversationManager(
+            llm=self.llm,
+            tools=self.tools,
+            max_history=self.settings.chat_history_limit,
+        )
+        try:
+            response = await manager.reply(history)
+        except LLMError:
+            logger.exception("LLM failed for anonymous chat")
+            raise
+        return ChatReply(
+            content=response.content or "",
+            model=response.model,
+            listings=listings or list(response.listings),
+            sources=sources or list(response.sources),
+            llm=response,
+        )
 
     async def send_message(
         self,
@@ -150,43 +214,7 @@ class ChatService:
         await self.repo.refresh(conv)
 
         history = await self._history_for_model(conv)
-        pre_listings: list = []
-        pre_sources: list = []
-        pre_articles: list = []
-        # اگر ابزار جستجو فعال است، نتیجه از خود ابزار می‌آید تا با کارت‌های UI یکی باشد.
-        has_listing_tool = bool(self.tools and "search_listings" in self.tools.names())
-        if self.listing_intent.search(text) and not has_listing_tool:
-            try:
-                pre_listings = await self.listing_service.search(text)
-            except SpringBootError:
-                logger.warning("live listing search failed for conversation %s", conv.id)
-                pre_listings = []
-            if pre_listings:
-                history = list(history)
-                history[-1] = {
-                    "role": "user",
-                    "content": (
-                        text
-                        + "\n\n[نتایج جستجوی آگهی سایت BeautyBoss — فقط از این نتایج استفاده کن، قیمت و لینک را از همینها بگو و آگهی نساز]\n"
-                        + json.dumps(pre_listings, ensure_ascii=False)
-                    ),
-                }
-        elif self.knowledge_intent.search(text):
-            pre_articles = search_knowledge(text)
-            pre_sources = [
-                {"title": a["source"], "url": a["url"]}
-                for a in pre_articles
-            ]
-            if pre_articles:
-                history = list(history)
-                history[-1] = {
-                    "role": "user",
-                    "content": (
-                        text
-                        + "\n\n[منابع دانش BeautyBoss (راهنمای داخلی و منابع رسمی مثل FDA/NIH) — پاسخ را بر اساس همین منابع بده، منبع و لینک را ذکر کن و اگر کافی نبود صادقانه بگو]\n"
-                        + json.dumps(pre_articles, ensure_ascii=False)
-                    ),
-                }
+        history, pre_listings, pre_sources = await self._augment(history, text)
         manager = ConversationManager(
             llm=self.llm,
             tools=self.tools,

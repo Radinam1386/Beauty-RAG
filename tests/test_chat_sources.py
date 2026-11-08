@@ -14,7 +14,7 @@ async def test_send_message_knowledge_intent():
     conv = await svc.create_conversation(guest, title="پوست")
     result = await svc.send_message(guest, conv.id, "برای پوست خشک چه کرم مرطوبکننده‌ای خوب است؟")
     assert result.assistant_message.content
-    assert result.sources  # intent knowledge
+    assert not result.sources
     assert result.listings in (None, [])
 
 

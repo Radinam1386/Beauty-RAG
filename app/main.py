@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1.routes.chat import public_router as chat_public_router
 from app.api.v1.routes.chat import router as chat_router
 from app.api.v1.routes.listings import router as listings_router
 from app.api.v1.routes.knowledge import router as knowledge_router
@@ -36,6 +37,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         llm_client: LLMClient = create_llm_client()
     tool_registry: ToolRegistry = default_registry(
         include_listing_tools=settings.enable_listing_tools,
+        include_knowledge_tools=False,
         listing_service=ListingService(client=spring_boot_client),
     )
 
@@ -60,6 +62,7 @@ app = FastAPI(
 )
 
 settings = get_settings()
+api_prefix = settings.api_prefix_clean
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -70,7 +73,8 @@ app.add_middleware(
 )
 
 app.include_router(health_router)
-app.include_router(spring_boot_router, prefix="/api/v1")
-app.include_router(chat_router, prefix="/api/v1")
-app.include_router(listings_router, prefix="/api/v1")
-app.include_router(knowledge_router, prefix="/api/v1")
+app.include_router(spring_boot_router, prefix=api_prefix)
+app.include_router(chat_public_router, prefix=api_prefix)
+app.include_router(chat_router, prefix=api_prefix)
+app.include_router(listings_router, prefix=api_prefix)
+app.include_router(knowledge_router, prefix=api_prefix)

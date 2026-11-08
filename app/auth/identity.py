@@ -1,8 +1,8 @@
-"""تفکیک مهمان و کاربر لاگین‌شده.
+"""هویت درخواست: کاربر لاگین‌شده یا مهمان.
 
-کاربر لاگین‌شده: هدر X-User-Id که از سایت اصلی (Spring Boot) می‌آید.
-مهمان: هدر X-Guest-Session-Id یا کوکی bb_guest_session.
-اگر هیچ‌کدام نبود، یک نشست مهمان جدید ساخته می‌شود.
+کاربر لاگین‌شده: JWT در هدر ``Authorization: Bearer ...`` (در dependencies).
+مهمان: هدر X-Guest-Session-Id یا کوکی bb_guest_session؛ اگر نبود نشست مهمان جدید.
+هیچ‌وقت user_id از هدر/بدنه/کوئری خوانده نمی‌شود؛ فقط از توکن.
 """
 
 import uuid
@@ -10,12 +10,15 @@ from dataclasses import dataclass
 
 from fastapi import Request, Response
 
+MAX_ID_LEN = 64
+
 
 @dataclass(frozen=True)
 class Identity:
     owner_type: str  # 'guest' | 'user'
     external_user_id: str | None
     guest_session_id: str | None
+    role: str | None = None
 
     @property
     def is_guest(self) -> bool:
@@ -30,25 +33,17 @@ def _clean(value: str | None) -> str | None:
     if not value:
         return None
     value = value.strip()
-    return value[:64] if value else None
+    return value[:MAX_ID_LEN] if value else None
 
 
-def resolve_identity(
+def resolve_guest(
     request: Request,
     response: Response,
-    user_id_header: str = "X-User-Id",
+    *,
     guest_session_header: str = "X-Guest-Session-Id",
     cookie_name: str = "bb_guest_session",
     cookie_max_age: int = 60 * 60 * 24 * 30,
 ) -> Identity:
-    user_id = _clean(request.headers.get(user_id_header))
-    if user_id:
-        return Identity(
-            owner_type="user",
-            external_user_id=user_id,
-            guest_session_id=None,
-        )
-
     guest_id = _clean(request.headers.get(guest_session_header))
     if not guest_id:
         guest_id = _clean(request.cookies.get(cookie_name))

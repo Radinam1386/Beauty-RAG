@@ -61,17 +61,13 @@ def test_load_knowledge_warns_when_large(tmp_path, caplog):
     assert "RAG" in caplog.text
 
 
-def test_system_prompt_contains_knowledge_block():
+def test_system_prompt_does_not_include_site_knowledge():
     prompt = build_system_prompt()
-    assert KNOWLEDGE_START in prompt
-    assert KNOWLEDGE_END in prompt
-    assert prompt.index(KNOWLEDGE_START) < prompt.index(KNOWLEDGE_END)
-    block = prompt.split(KNOWLEDGE_START, 1)[1].split(KNOWLEDGE_END, 1)[0]
-    assert "ضدآفتاب" in block
-    assert "TODO(team)" in block
+    assert KNOWLEDGE_START not in prompt
+    assert KNOWLEDGE_END not in prompt
 
 
 def test_system_prompt_without_knowledge_has_no_block():
     prompt = build_system_prompt(knowledge="")
     assert KNOWLEDGE_START not in prompt
-    assert "در دسترس نیست" in prompt
+    assert KNOWLEDGE_END not in prompt

@@ -1,6 +1,7 @@
-"""فیکسچرهای مشترک فاز ۲ — بدون دیتابیس واقعی و بدون LLM واقعی."""
+"""فیکسچرهای مشترک فاز ۲ و ۴ — بدون دیتابیس واقعی و بدون LLM واقعی."""
 
 import os
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -13,24 +14,45 @@ os.environ.setdefault("LLM_BASE_URL", "http://llm.test/v1")
 os.environ.setdefault("LLM_API_KEY", "test-key")
 os.environ.setdefault("LLM_MODEL", "test-model")
 os.environ.setdefault("CHAT_HISTORY_LIMIT", "8")
+os.environ.setdefault("CHAT_MAX_MESSAGE_CHARS", "2000")
 os.environ.setdefault("SPRING_BOOT_BASE_URL", "http://spring.test")
+os.environ.setdefault("JWT_SECRET", "test-secret")
+os.environ.setdefault("JWT_ALGORITHM", "HS256")
 
-from fastapi import FastAPI  # noqa: E402
+from fastapi import FastAPI, HTTPException  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 
-from app.ai.llm import FakeLLMClient, LLMClient, LLMResponse, Usage  # noqa: E402
+from app.ai.llm import FakeLLMClient  # noqa: E402
 from app.api.dependencies import (  # noqa: E402
+    get_budget,
     get_chat_service,
     get_llm_client,
     get_tool_registry,
 )
-from app.api.v1.routes.chat import router as chat_router  # noqa: E402
-from app.auth.identity import Identity  # noqa: E402
+from app.api.v1.routes.chat import public_router, router as chat_router  # noqa: E402
 from app.auth.dependencies import get_identity  # noqa: E402
+from app.auth.identity import Identity  # noqa: E402
 from app.chat.repository import ChatRepository  # noqa: E402
 from app.chat.service import ChatService  # noqa: E402
 from app.database.models import Conversation, Message  # noqa: E402
-from app.tools.base import Tool, ToolRegistry, ToolResult  # noqa: E402
+from app.tools.base import ToolRegistry  # noqa: E402
+
+JWT_SECRET = os.environ["JWT_SECRET"]
+
+
+def auth_headers(user_id: str = "user-1", minutes: int = 10, **extra: str) -> dict[str, str]:
+    """هدر Authorization با توکن معتبر برای تست‌های HTTP."""
+    import jwt
+
+    now = int(time.time())
+    token = jwt.encode(
+        {"sub": user_id, "iat": now, "exp": now + minutes * 60},
+        JWT_SECRET,
+        algorithm="HS256",
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+    headers.update(extra)
+    return headers
 
 
 class FakeChatRepository(ChatRepository):
@@ -140,10 +162,41 @@ class FakeChatRepository(ChatRepository):
         return None
 
 
+class FakeBudget:
+    """به‌جای DailyBudget در تست‌ها تا به دیتابیس نیاز نباشد."""
+
+    def __init__(self, limit: int = 0) -> None:
+        self.limit = limit
+        self.used = 0
+        self.recorded = 0
+        self.checks = 0
+
+    async def check(self) -> None:
+        self.checks += 1
+        if self.limit and self.used >= self.limit:
+            raise HTTPException(
+                status_code=503,
+                detail="سرویس موقتاً در دسترس نیست. لطفاً بعداً تلاش کنید.",
+            )
+
+    async def record(self, prompt_tokens: int = 0, completion_tokens: int = 0) -> None:
+        self.recorded += 1
+        self.used += int(prompt_tokens or 0) + int(completion_tokens or 0)
+
+
 def make_identity(user: bool = False, key: str = "u1") -> Identity:
     if user:
         return Identity(owner_type="user", external_user_id=key, guest_session_id=None)
     return Identity(owner_type="guest", external_user_id=None, guest_session_id=key)
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    from app.limits import rate_limiter
+
+    rate_limiter.reset()
+    yield
+    rate_limiter.reset()
 
 
 @pytest.fixture
@@ -154,6 +207,11 @@ def fake_repo() -> FakeChatRepository:
 @pytest.fixture
 def fake_llm() -> FakeLLMClient:
     return FakeLLMClient(reply="پاسخ آزمایشی دستیار.")
+
+
+@pytest.fixture
+def fake_budget() -> FakeBudget:
+    return FakeBudget()
 
 
 @pytest.fixture
@@ -170,16 +228,19 @@ def user() -> Identity:
 def app(
     fake_repo: FakeChatRepository,
     fake_llm: FakeLLMClient,
-    guest: Identity,
+    fake_budget: FakeBudget,
 ) -> FastAPI:
     test_app = FastAPI()
+    test_app.include_router(public_router, prefix="/api/v1")
     test_app.include_router(chat_router, prefix="/api/v1")
     service = ChatService(repository=fake_repo, llm=fake_llm, tools=None)
 
-    test_app.dependency_overrides[get_identity] = lambda: guest
+    # پیش‌فرض: کاربر لاگین‌شده؛ تست‌های مهمان خودشان override می‌کنند.
+    test_app.dependency_overrides[get_identity] = lambda: make_identity(True, "user-1")
     test_app.dependency_overrides[get_chat_service] = lambda: service
     test_app.dependency_overrides[get_llm_client] = lambda: fake_llm
     test_app.dependency_overrides[get_tool_registry] = lambda: ToolRegistry()
+    test_app.dependency_overrides[get_budget] = lambda: fake_budget
     return test_app
 
 
